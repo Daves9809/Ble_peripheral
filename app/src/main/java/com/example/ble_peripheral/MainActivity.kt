@@ -8,9 +8,11 @@ import android.content.ServiceConnection
 import android.os.*
 import android.util.Log
 import android.view.KeyEvent
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -23,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.node.modifierElementOf
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -99,12 +102,23 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalComposeUiApi::class)
     @Composable
     fun MainScreen(mainViewModel: MainViewModel = hiltViewModel()) {
+
         val stateConnection: Boolean by mainViewModel.value.observeAsState(initial = false)
 
         RequestPermissions()
         var switchState by remember {
             mutableStateOf(false)
         }
+
+        var readedData by remember {
+            mutableStateOf("")
+        }
+
+        //initialize callback for read data from central
+        gattServiceConn?.binding?.enableCallBacks {
+            readedData = String(it.value!!)
+        }
+
         val (focusRequester) = remember { FocusRequester.createRefs() }
         val focusManager = LocalFocusManager.current
 
@@ -161,19 +175,18 @@ class MainActivity : ComponentActivity() {
                     label = {
                         Text(text = "Send Value")
                     })
-                OutlinedTextField(value = textValue,
+                OutlinedTextField(value = readedData,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(
                         onDone = { focusManager.clearFocus() }
                     ),
                     enabled = false,
                     onValueChange = {
-                        textValue = it
-                        gattServiceConn?.binding?.setMyCharacteristicValue(it)
                     },
                     label = {
                         Text(text = "Received value")
                     })
+
             }
         }
     }

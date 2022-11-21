@@ -59,7 +59,7 @@ dependencies {
     implementation "androidx.datastore:datastore-preferences:1.0.0"
 
     //NordicSemiConductor
-    implementation 'no.nordicsemi.android:ble:2.6.0-alpha03'
+    implementation 'no.nordicsemi.android:ble:2.5.1'
 
     //Hilt
     implementation "com.google.dagger:hilt-android:2.44"

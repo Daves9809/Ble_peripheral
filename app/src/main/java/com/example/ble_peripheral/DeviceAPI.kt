@@ -1,6 +1,7 @@
 package com.example.ble_peripheral
 
 import kotlinx.coroutines.flow.Flow
+import no.nordicsemi.android.ble.data.Data
 
 
 interface DeviceAPI {
@@ -9,5 +10,5 @@ interface DeviceAPI {
 	 */
 	fun setMyCharacteristicValue(value: String)
 
-
+	fun enableCallBacks(callback: (Data) ->Unit)
 }

@@ -41,7 +41,11 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import no.nordicsemi.android.ble.BleManager
 import no.nordicsemi.android.ble.BleServerManager
+import no.nordicsemi.android.ble.ReadRequest
+import no.nordicsemi.android.ble.WaitForValueChangedRequest
+import no.nordicsemi.android.ble.data.Data
 import no.nordicsemi.android.ble.observer.ServerObserver
+import java.net.Authenticator.RequestorType
 import java.nio.charset.StandardCharsets
 import java.util.*
 import javax.inject.Inject
@@ -67,8 +71,7 @@ import javax.inject.Inject
  * </pre>
  */
 @AndroidEntryPoint
-class GattService(
-) : Service() {
+class GattService() : Service() {
     @Inject
     lateinit var repository: UserPreferencesRepository
 
@@ -183,6 +186,10 @@ class GattService(
         override fun setMyCharacteristicValue(value: String) {
             serverManager?.setMyCharacteristicValue(value)
         }
+
+        override fun enableCallBacks(callback: (Data) -> Unit) {
+            serverManager?.enableCallBacks(callback)
+        }
     }
 
     /*
@@ -201,7 +208,7 @@ class GattService(
             MyServiceProfile.MY_CHARACTERISTIC_UUID,
             // Properties:
             BluetoothGattCharacteristic.PROPERTY_READ
-                    or BluetoothGattCharacteristic.PROPERTY_NOTIFY or BluetoothGattCharacteristic.PROPERTY_WRITE,
+                    or BluetoothGattCharacteristic.PROPERTY_NOTIFY,
             // Permissions:
             BluetoothGattCharacteristic.PERMISSION_READ_ENCRYPTED_MITM,
             // Descriptors:
@@ -215,11 +222,25 @@ class GattService(
             ),
             description("A characteristic to be read", false) // descriptors
         )
+
+        private val secondGattCharacteristic = sharedCharacteristic(
+            MyServiceProfile.SECOND_CHARACTERISTIC_UUID,
+            BluetoothGattCharacteristic.PROPERTY_WRITE,
+            BluetoothGattCharacteristic.PERMISSION_WRITE,
+            descriptor(
+                CLIENT_CHARACTERISTIC_CONFIG_DESCRIPTOR_UUID,
+                BluetoothGattDescriptor.PERMISSION_WRITE,
+                byteArrayOf(0, 0)
+            ),
+            description("A characteristic to be write", false)
+        )
         private val myGattService = service(
             // UUID:
             MyServiceProfile.MY_SERVICE_UUID,
             // Characteristics (just one in this case):
-            myGattCharacteristic
+            myGattCharacteristic,
+            secondGattCharacteristic
+
         )
 
         private val myGattServices = Collections.singletonList(myGattService)
@@ -231,6 +252,13 @@ class GattService(
             myGattCharacteristic.value = bytes
             serverConnections.values.forEach { serverConnection ->
                 serverConnection.sendNotificationForMyGattCharacteristic(bytes)
+            }
+        }
+
+
+        override fun enableCallBacks(callback: (Data) -> Unit) {
+            serverConnections.values.forEach{ serverConnection ->
+                serverConnection.enableNotificationCallback(callback)
             }
         }
 
@@ -288,12 +316,15 @@ class GattService(
             private var gattCallback: GattCallback? = null
 
             fun sendNotificationForMyGattCharacteristic(value: ByteArray) {
-                sendNotification(myGattCharacteristic, value).enqueue()
+                sendNotification(myGattCharacteristic, value)
+                    .enqueue()
             }
-            fun readDescriptor(){
-                val value = readCharacteristic(myGattCharacteristic)
-                value.await()
+
+            fun enableNotificationCallback(callback: (Data) -> Unit){
+                setNotificationCallback(secondGattCharacteristic).with{_, data ->callback(data)}
+                enableNotifications(secondGattCharacteristic).enqueue()
             }
+
 
             override fun log(priority: Int, message: String) {
                 this@ServerManager.log(priority, message)
@@ -322,5 +353,7 @@ class GattService(
     object MyServiceProfile {
         val MY_SERVICE_UUID: UUID = UUID.fromString("80323644-3537-4F0F-A53B-CF494ECEAAB3")
         val MY_CHARACTERISTIC_UUID: UUID = UUID.fromString("80323644-3537-4C0B-A53B-CF494ECEAAB3")
+        val SECOND_CHARACTERISTIC_UUID: UUID =
+            UUID.fromString("80323644-3537-4C0B-A53B-CD494BCEAAA3")
     }
 }
